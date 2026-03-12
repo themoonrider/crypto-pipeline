@@ -1,0 +1,9 @@
+[
+    {"name": "coin_id", "type": "STRING", "mode": "NULLABLE"},
+    {"name": "vs_currency", "type": "STRING", "mode": "NULLABLE"},
+    {"name": "fetch_start", "type": "STRING", "mode": "NULLABLE"},
+    {"name": "fetch_end", "type": "STRING", "mode": "NULLABLE"},
+    {"name": "raw_json", "type": "STRING", "mode": "NULLABLE"},
+    {"name": "__de_processed_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
+    {"name": "__run_id", "type": "STRING", "mode": "NULLABLE"}
+]

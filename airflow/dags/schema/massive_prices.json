@@ -1,0 +1,20 @@
+[
+    {"name": "symbol", "type": "STRING", "mode": "NULLABLE"},
+    {"name": "fetch_start", "type": "STRING", "mode": "NULLABLE"},
+    {"name": "fetch_end", "type": "STRING", "mode": "NULLABLE"},
+    {
+        "name": "results",
+        "type": "RECORD",
+        "mode": "REPEATED",
+        "fields": [
+            {"name": "timestamp", "type": "INTEGER", "mode": "NULLABLE"},
+            {"name": "open", "type": "FLOAT", "mode": "NULLABLE"},
+            {"name": "high", "type": "FLOAT", "mode": "NULLABLE"},
+            {"name": "low", "type": "FLOAT", "mode": "NULLABLE"},
+            {"name": "close", "type": "FLOAT", "mode": "NULLABLE"},
+            {"name": "volume", "type": "FLOAT", "mode": "NULLABLE"}
+        ]
+    },
+    {"name": "__de_processed_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
+    {"name": "__run_id", "type": "STRING", "mode": "NULLABLE"}
+]
