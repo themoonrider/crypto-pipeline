@@ -1,0 +1,33 @@
+name: 'market_pipeline'
+version: '1.0.0'
+config-version: 2
+
+profile: 'market_pipeline'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  market_pipeline:
+    staging:
+      +schema: staging
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table
+tests:
+  +store_failures: true
+  +schema: test_results
+
+vars:
+  # Default lookback window — override via dbt run --vars '{"lookback_days": 730}'
+  lookback_days: 365

@@ -1,0 +1,62 @@
+version: 2
+
+sources:
+  - name: raw_market_data
+    schema: raw_market_data
+    description: "Raw ingested data from API operators, loaded via GCSToBigQueryOperator"
+
+    tables:
+      - name: massive_prices
+        description: >
+          Raw OHLCV data from Massive API (stocks, forex, indices).
+          Each row contains a nested results array with daily bars.
+          Partitioned by __de_processed_at (DAY), clustered by symbol.
+        columns:
+          - name: symbol
+            description: "Ticker symbol (e.g. AAPL, C:EURUSD)"
+            tests: [not_null]
+          - name: fetch_start
+            description: "Start date of the fetch window (YYYY-MM-DD)"
+          - name: fetch_end
+            description: "End date of the fetch window (YYYY-MM-DD)"
+          - name: results
+            description: "Repeated record of daily OHLCV bars"
+          - name: results.timestamp
+            description: "Unix timestamp in milliseconds"
+          - name: results.open
+            description: "Opening price"
+          - name: results.high
+            description: "High price"
+          - name: results.low
+            description: "Low price"
+          - name: results.close
+            description: "Closing price"
+          - name: results.volume
+            description: "Trading volume"
+          - name: __de_processed_at
+            description: "UTC timestamp when data was ingested"
+          - name: __run_id
+            description: "Airflow run_id for lineage"
+
+      - name: coingecko_market_chart
+        description: >
+          Raw Bitcoin market chart data from CoinGecko API.
+          Stores the full API response as a raw_json string column.
+          Partitioned by __de_processed_at (DAY), clustered by coin_id.
+        columns:
+          - name: coin_id
+            description: "CoinGecko coin identifier (e.g. bitcoin)"
+            tests: [not_null]
+          - name: vs_currency
+            description: "Quote currency (e.g. usd)"
+          - name: fetch_start
+            description: "Start date of the fetch window (YYYY-MM-DD)"
+          - name: fetch_end
+            description: "End date of the fetch window (YYYY-MM-DD)"
+          - name: raw_json
+            description: "Full CoinGecko API response as JSON string (prices, market_caps, total_volumes)"
+            tests: [not_null]
+          - name: __de_processed_at
+            description: "UTC timestamp when data was ingested"
+          - name: __run_id
+            description: "Airflow run_id for lineage"
