@@ -1,0 +1,13 @@
+.env
+*/logs/*
+*/__pycache__/*
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.ipynb_checkpoints
+# Ignore dbt target and dbt packages directories
+dbt/target/
+dbt/dbt_packages/
+# Ignore local dbt profiles directory
+dbt/profiles.yml
