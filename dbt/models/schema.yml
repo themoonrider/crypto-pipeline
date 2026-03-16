@@ -1,0 +1,176 @@
+version: 2
+
+models:
+  # ─── Staging ────────────────────────────────────────────────────────────────
+  - name: stg_massive_prices
+    description: "Cleaned and standardised Massive API data (stocks, forex, indices)"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [symbol, price_date]
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 1
+      - dbt_expectations.expect_column_distinct_count_to_equal:
+          column_name: symbol
+          value: 6
+    columns:
+      - name: symbol
+        tests: [not_null]
+      - name: price_date
+        tests: [not_null]
+      - name: close_price
+        tests:
+          - not_null
+      - name: open_price
+      - name: high_price
+      - name: low_price
+      - name: volume
+
+  - name: stg_coingecko_prices
+    description: "Cleaned CoinGecko Bitcoin price data"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [symbol, price_date]
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 1
+    columns:
+      - name: symbol
+        tests: [not_null]
+      - name: price_date
+        tests: [not_null]
+      - name: close_price
+        tests:
+          - not_null
+      - name: volume
+      - name: market_cap
+
+  # ─── Dimensions ─────────────────────────────────────────────────────────────
+  - name: dim_assets
+    description: "Asset dimension table — one row per tradeable asset"
+    tests:
+      - dbt_expectations.expect_table_row_count_to_equal:
+          value: 7
+    columns:
+      - name: symbol
+        tests: [unique, not_null]
+      - name: asset_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['stock', 'index', 'forex', 'crypto']
+      - name: asset_class
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['equity', 'index', 'fx', 'crypto']
+
+  - name: dim_dates
+    description: "Date dimension — full calendar spine"
+    columns:
+      - name: date_key
+        tests: [unique, not_null]
+
+  # ─── Facts ──────────────────────────────────────────────────────────────────
+  - name: fact_daily_prices
+    description: "Core fact table — one row per asset per trading day"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [symbol, price_date]
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 1
+      - dbt_expectations.expect_column_distinct_count_to_equal:
+          column_name: symbol
+          value: 7
+    columns:
+      - name: price_key
+        tests: [unique, not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: price_date
+        tests: [not_null]
+      - name: close_price
+        tests:
+          - not_null
+      - name: has_data_gap
+        description: "TRUE when gap between consecutive prices > 5 days"
+      - name: daily_return
+      - name: log_return
+      - name: intraday_range_pct
+
+  # ─── Marts ────────────────────────────────────────────────────────────────
+  - name: rolling_performance
+    description: "Rolling window performance metrics (7/30/90/180/365d)"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [symbol, price_date]
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 1
+      - dbt_expectations.expect_column_distinct_count_to_equal:
+          column_name: symbol
+          value: 7
+    columns:
+      - name: symbol
+        tests: [not_null]
+      - name: price_date
+        tests: [not_null]
+      - name: close_price
+        tests:
+          - not_null
+      - name: volatility_30d
+      - name: volatility_365d
+
+  - name: btc_relative_performance
+    description: "Traditional asset performance vs Bitcoin — daily comparison"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [symbol, price_date]
+      - dbt_expectations.expect_column_distinct_count_to_equal:
+          column_name: symbol
+          value: 6
+      - dbt_expectations.expect_column_values_to_not_be_in_set:
+          column_name: symbol
+          value_set: ['bitcoin']
+    columns:
+      - name: symbol
+        tests: [not_null]
+      - name: price_date
+        tests: [not_null]
+      - name: close_price
+      - name: btc_price
+      - name: relative_volatility_365d_vs_btc
+
+  - name: asset_performance_summary
+    description: "One-row-per-asset summary of key performance and risk metrics"
+    tests:
+      - dbt_expectations.expect_table_row_count_to_equal:
+          value: 7
+    columns:
+      - name: symbol
+        tests: [unique, not_null]
+      - name: rank_return_365d
+      - name: rank_low_volatility
+      - name: vol_ratio_vs_btc
+
+  - name: volatility_correlation_summary
+    description: "Pairwise correlation matrix and annualised volatility comparison"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [symbol_a, symbol_b]
+      - dbt_expectations.expect_table_row_count_to_equal:
+          value: 21
+    columns:
+      - name: symbol_a
+        tests: [not_null]
+      - name: symbol_b
+        tests: [not_null]
+      - name: correlation
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: -1.0
+              max_value: 1.0
+      - name: obs_count
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+      - name: volatility_a
+      - name: volatility_b
