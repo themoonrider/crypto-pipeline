@@ -71,7 +71,7 @@ joined AS (
         CASE
             WHEN t.daily_return IS NOT NULL AND b.btc_daily_return IS NOT NULL
             THEN t.daily_return - b.btc_daily_return
-        END AS daily_excess_return_vs_btc,
+        END AS outperformance_1d,
 
         -- Rolling returns (asset)
         t.return_7d             AS asset_return_7d,
@@ -137,7 +137,7 @@ SELECT
     ROUND(daily_return, 6)                   AS daily_return,
     ROUND(btc_price, 2)                      AS btc_price,
     ROUND(btc_daily_return, 6)               AS btc_daily_return,
-    ROUND(daily_excess_return_vs_btc, 6)     AS daily_excess_return_vs_btc,
+    ROUND(outperformance_1d, 6)     AS outperformance_1d,
 
     ROUND(asset_return_7d, 6)                AS asset_return_7d,
     ROUND(asset_return_30d, 6)               AS asset_return_30d,

@@ -21,8 +21,7 @@ WITH base AS (
         asset_type,
         price_date,
         close_price,
-        daily_return,
-        log_return
+        daily_return
     FROM {{ ref('fact_daily_prices') }}
     WHERE close_price IS NOT NULL
 ),

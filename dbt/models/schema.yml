@@ -14,16 +14,26 @@ models:
           value: 6
     columns:
       - name: symbol
+        description: "Ticker symbol (e.g. AAPL, GOOGL, MSFT, SPY, EUR/USD, GBP/USD)"
         tests: [not_null]
       - name: price_date
+        description: "Trading date"
         tests: [not_null]
-      - name: close_price
-        tests:
-          - not_null
       - name: open_price
+        description: "Opening price for the trading day"
       - name: high_price
+        description: "Highest price during the trading day"
       - name: low_price
+        description: "Lowest price during the trading day"
+      - name: close_price
+        description: "Closing price for the trading day"
+        tests: [not_null]
       - name: volume
+        description: "Number of shares/units traded"
+      - name: __de_processed_at
+        description: "Timestamp when the record was ingested"
+      - name: __run_id
+        description: "Airflow run ID that produced this record"
 
   - name: stg_coingecko_prices
     description: "Cleaned CoinGecko Bitcoin price data"
@@ -34,14 +44,24 @@ models:
           min_value: 1
     columns:
       - name: symbol
+        description: "Coin identifier (bitcoin)"
         tests: [not_null]
+      - name: vs_currency
+        description: "Quote currency (usd)"
       - name: price_date
+        description: "Trading date"
         tests: [not_null]
       - name: close_price
-        tests:
-          - not_null
+        description: "Closing price in USD"
+        tests: [not_null]
       - name: volume
+        description: "24h trading volume in USD"
       - name: market_cap
+        description: "Market capitalisation in USD"
+      - name: __de_processed_at
+        description: "Timestamp when the record was ingested"
+      - name: __run_id
+        description: "Airflow run ID that produced this record"
 
   # ─── Dimensions ─────────────────────────────────────────────────────────────
   - name: dim_assets
@@ -51,23 +71,77 @@ models:
           value: 7
     columns:
       - name: symbol
+        description: "Unique ticker symbol"
         tests: [unique, not_null]
       - name: asset_type
+        description: "Type of asset (stock, index, forex, crypto)"
         tests:
           - not_null
           - accepted_values:
               values: ['stock', 'index', 'forex', 'crypto']
+      - name: asset_name
+        description: "Human-readable asset name"
       - name: asset_class
+        description: "Asset class grouping (equity, index, fx, crypto)"
         tests:
           - not_null
           - accepted_values:
               values: ['equity', 'index', 'fx', 'crypto']
+      - name: currency
+        description: "Denomination currency"
+      - name: exchange
+        description: "Exchange where the asset is traded"
+      - name: region
+        description: "Geographic region (US, Global)"
+      - name: is_benchmark
+        description: "Whether the asset is used as a benchmark"
+      - name: first_seen
+        description: "Earliest price date in the dataset"
+      - name: last_seen
+        description: "Latest price date in the dataset"
+      - name: trading_days_available
+        description: "Total number of trading days with data"
+      - name: __dbt_updated_at
+        description: "Timestamp when dbt last refreshed this row"
 
   - name: dim_dates
     description: "Date dimension — full calendar spine"
     columns:
       - name: date_key
+        description: "Date in YYYYMMDD integer format"
         tests: [unique, not_null]
+      - name: full_date
+        description: "Calendar date"
+      - name: year
+        description: "Calendar year"
+      - name: month
+        description: "Month number (1-12)"
+      - name: day
+        description: "Day of month (1-31)"
+      - name: day_of_week
+        description: "Day of week (1=Sunday, 7=Saturday)"
+      - name: day_of_year
+        description: "Day of year (1-366)"
+      - name: week_of_year
+        description: "ISO week number"
+      - name: quarter
+        description: "Calendar quarter (1-4)"
+      - name: day_name
+        description: "Day name (Monday, Tuesday, ...)"
+      - name: month_name
+        description: "Month name (January, February, ...)"
+      - name: year_month
+        description: "Year-month string (e.g. 2025-03)"
+      - name: year_quarter
+        description: "Year-quarter string (e.g. 2025-Q1)"
+      - name: is_weekend
+        description: "TRUE if Saturday or Sunday"
+      - name: is_weekday
+        description: "TRUE if Monday through Friday"
+      - name: days_ago
+        description: "Number of days from current date"
+      - name: is_today
+        description: "TRUE if the date is today"
 
   # ─── Facts ──────────────────────────────────────────────────────────────────
   - name: fact_daily_prices
@@ -82,21 +156,51 @@ models:
           value: 7
     columns:
       - name: price_key
+        description: "Surrogate key (symbol + price_date hash)"
         tests: [unique, not_null]
+      - name: asset_key
+        description: "Foreign key to dim_assets"
+      - name: date_key
+        description: "Foreign key to dim_dates (YYYYMMDD)"
       - name: symbol
+        description: "Ticker symbol"
         tests: [not_null]
+      - name: asset_type
+        description: "Type of asset (stock, index, forex, crypto)"
       - name: price_date
+        description: "Trading date"
         tests: [not_null]
       - name: close_price
-        tests:
-          - not_null
+        description: "Closing price"
+        tests: [not_null]
+      - name: open_price
+        description: "Opening price"
+      - name: high_price
+        description: "Highest price during the day"
+      - name: low_price
+        description: "Lowest price during the day"
+      - name: volume
+        description: "Trading volume"
+      - name: market_cap
+        description: "Market capitalisation (crypto only)"
+      - name: daily_return
+        description: "Simple daily return vs previous close (NULL if no prev data or price <= 0)"
+      - name: prev_close_price
+        description: "Previous trading day's close price"
+      - name: intraday_range_pct
+        description: "Intraday range as percentage of close price (NULL if missing data or close_price <= 0)"
+      - name: days_since_prev
+        description: "Calendar days since previous trading day"
       - name: has_data_gap
         description: "TRUE when gap between consecutive prices > 5 days"
-      - name: daily_return
-      - name: log_return
-      - name: intraday_range_pct
+      - name: __run_id
+        description: "Airflow run ID that produced this record"
+      - name: __de_processed_at
+        description: "Timestamp when the record was ingested"
+      - name: __dbt_updated_at
+        description: "Timestamp when dbt last refreshed this row"
 
-  # ─── Marts ────────────────────────────────────────────────────────────────
+  # ─── Marts ──────────────────────────────────────────────────────────────────
   - name: rolling_performance
     description: "Rolling window performance metrics (7/30/90/180/365d)"
     tests:
@@ -109,14 +213,50 @@ models:
           value: 7
     columns:
       - name: symbol
+        description: "Ticker symbol"
         tests: [not_null]
+      - name: asset_type
+        description: "Type of asset"
       - name: price_date
+        description: "Trading date"
         tests: [not_null]
       - name: close_price
-        tests:
-          - not_null
+        description: "Closing price"
+        tests: [not_null]
+      - name: daily_return
+        description: "Simple daily return"
+      - name: return_7d
+        description: "Cumulative return over past 7 calendar days"
+      - name: return_30d
+        description: "Cumulative return over past 30 calendar days"
+      - name: return_90d
+        description: "Cumulative return over past 90 calendar days"
+      - name: return_180d
+        description: "Cumulative return over past 180 calendar days"
+      - name: return_365d
+        description: "Cumulative return over past 365 calendar days"
+      - name: volatility_7d
+        description: "Annualised volatility over past 7 calendar days"
       - name: volatility_30d
+        description: "Annualised volatility over past 30 calendar days (NULL if < 10 return observations)"
+      - name: volatility_90d
+        description: "Annualised volatility over past 90 calendar days"
+      - name: volatility_180d
+        description: "Annualised volatility over past 180 calendar days"
       - name: volatility_365d
+        description: "Annualised volatility over past 365 calendar days"
+      - name: obs_7d
+        description: "Number of return observations in 7d window"
+      - name: obs_30d
+        description: "Number of return observations in 30d window"
+      - name: obs_90d
+        description: "Number of return observations in 90d window"
+      - name: obs_180d
+        description: "Number of return observations in 180d window"
+      - name: obs_365d
+        description: "Number of return observations in 365d window"
+      - name: __dbt_updated_at
+        description: "Timestamp when dbt last refreshed this row"
 
   - name: btc_relative_performance
     description: "Traditional asset performance vs Bitcoin — daily comparison"
@@ -131,24 +271,173 @@ models:
           value_set: ['bitcoin']
     columns:
       - name: symbol
+        description: "Ticker symbol (excludes bitcoin)"
         tests: [not_null]
+      - name: asset_type
+        description: "Type of asset"
       - name: price_date
+        description: "Trading date"
         tests: [not_null]
       - name: close_price
+        description: "Asset closing price"
+      - name: daily_return
+        description: "Asset daily return"
       - name: btc_price
+        description: "Bitcoin closing price on same date"
+      - name: btc_daily_return
+        description: "Bitcoin daily return on same date"
+      - name: daily_excess_return_vs_btc
+        description: "Asset daily return minus Bitcoin daily return"
+      - name: asset_return_7d
+        description: "Asset cumulative return over 7 days"
+      - name: asset_return_30d
+        description: "Asset cumulative return over 30 days"
+      - name: asset_return_90d
+        description: "Asset cumulative return over 90 days"
+      - name: asset_return_180d
+        description: "Asset cumulative return over 180 days"
+      - name: asset_return_365d
+        description: "Asset cumulative return over 365 days"
+      - name: btc_return_7d
+        description: "Bitcoin cumulative return over 7 days"
+      - name: btc_return_30d
+        description: "Bitcoin cumulative return over 30 days"
+      - name: btc_return_90d
+        description: "Bitcoin cumulative return over 90 days"
+      - name: btc_return_180d
+        description: "Bitcoin cumulative return over 180 days"
+      - name: btc_return_365d
+        description: "Bitcoin cumulative return over 365 days"
+      - name: outperformance_vs_btc_7d
+        description: "Asset return minus BTC return over 7 days"
+      - name: outperformance_vs_btc_30d
+        description: "Asset return minus BTC return over 30 days"
+      - name: outperformance_vs_btc_90d
+        description: "Asset return minus BTC return over 90 days"
+      - name: outperformance_vs_btc_180d
+        description: "Asset return minus BTC return over 180 days"
+      - name: outperformance_vs_btc_365d
+        description: "Asset return minus BTC return over 365 days"
+      - name: asset_volatility_7d
+        description: "Asset annualised volatility over 7 days"
+      - name: btc_volatility_7d
+        description: "Bitcoin annualised volatility over 7 days"
+      - name: relative_volatility_7d_vs_btc
+        description: "Asset volatility / BTC volatility over 7 days"
+      - name: asset_volatility_30d
+        description: "Asset annualised volatility over 30 days"
+      - name: btc_volatility_30d
+        description: "Bitcoin annualised volatility over 30 days"
+      - name: relative_volatility_30d_vs_btc
+        description: "Asset volatility / BTC volatility over 30 days"
+      - name: asset_volatility_90d
+        description: "Asset annualised volatility over 90 days"
+      - name: btc_volatility_90d
+        description: "Bitcoin annualised volatility over 90 days"
+      - name: relative_volatility_90d_vs_btc
+        description: "Asset volatility / BTC volatility over 90 days"
+      - name: asset_volatility_180d
+        description: "Asset annualised volatility over 180 days"
+      - name: btc_volatility_180d
+        description: "Bitcoin annualised volatility over 180 days"
+      - name: relative_volatility_180d_vs_btc
+        description: "Asset volatility / BTC volatility over 180 days"
+      - name: asset_volatility_365d
+        description: "Asset annualised volatility over 365 days"
+      - name: btc_volatility_365d
+        description: "Bitcoin annualised volatility over 365 days"
       - name: relative_volatility_365d_vs_btc
+        description: "Asset volatility / BTC volatility over 365 days"
+      - name: __dbt_updated_at
+        description: "Timestamp when dbt last refreshed this row"
 
-  - name: asset_performance_summary
-    description: "One-row-per-asset summary of key performance and risk metrics"
+  - name: asset_performance_summary_latest
+    description: "One-row-per-asset summary of key performance and risk metrics on the latest available day"
     tests:
       - dbt_expectations.expect_table_row_count_to_equal:
           value: 7
     columns:
       - name: symbol
-        tests: [unique, not_null]
-      - name: rank_return_365d
-      - name: rank_low_volatility
-      - name: vol_ratio_vs_btc
+        description: "Ticker symbol (excludes bitcoin)"
+        tests: [not_null]
+      - name: asset_type
+        description: "Type of asset"
+      - name: price_date
+        description: "Trading date"
+        tests: [not_null]
+      - name: close_price
+        description: "Asset closing price"
+      - name: daily_return
+        description: "Asset daily return"
+      - name: btc_price
+        description: "Bitcoin closing price on same date"
+      - name: btc_daily_return
+        description: "Bitcoin daily return on same date"
+      - name: outperformance_vs_btc_1d
+        description: "Asset daily return minus Bitcoin daily return"
+      - name: asset_return_7d
+        description: "Asset cumulative return over 7 days"
+      - name: asset_return_30d
+        description: "Asset cumulative return over 30 days"
+      - name: asset_return_90d
+        description: "Asset cumulative return over 90 days"
+      - name: asset_return_180d
+        description: "Asset cumulative return over 180 days"
+      - name: asset_return_365d
+        description: "Asset cumulative return over 365 days"
+      - name: btc_return_7d
+        description: "Bitcoin cumulative return over 7 days"
+      - name: btc_return_30d
+        description: "Bitcoin cumulative return over 30 days"
+      - name: btc_return_90d
+        description: "Bitcoin cumulative return over 90 days"
+      - name: btc_return_180d
+        description: "Bitcoin cumulative return over 180 days"
+      - name: btc_return_365d
+        description: "Bitcoin cumulative return over 365 days"
+      - name: outperformance_vs_btc_7d
+        description: "Asset return minus BTC return over 7 days"
+      - name: outperformance_vs_btc_30d
+        description: "Asset return minus BTC return over 30 days"
+      - name: outperformance_vs_btc_90d
+        description: "Asset return minus BTC return over 90 days"
+      - name: outperformance_vs_btc_180d
+        description: "Asset return minus BTC return over 180 days"
+      - name: outperformance_vs_btc_365d
+        description: "Asset return minus BTC return over 365 days"
+      - name: asset_volatility_7d
+        description: "Asset annualised volatility over 7 days"
+      - name: btc_volatility_7d
+        description: "Bitcoin annualised volatility over 7 days"
+      - name: relative_volatility_7d_vs_btc
+        description: "Asset volatility / BTC volatility over 7 days"
+      - name: asset_volatility_30d
+        description: "Asset annualised volatility over 30 days"
+      - name: btc_volatility_30d
+        description: "Bitcoin annualised volatility over 30 days"
+      - name: relative_volatility_30d_vs_btc
+        description: "Asset volatility / BTC volatility over 30 days"
+      - name: asset_volatility_90d
+        description: "Asset annualised volatility over 90 days"
+      - name: btc_volatility_90d
+        description: "Bitcoin annualised volatility over 90 days"
+      - name: relative_volatility_90d_vs_btc
+        description: "Asset volatility / BTC volatility over 90 days"
+      - name: asset_volatility_180d
+        description: "Asset annualised volatility over 180 days"
+      - name: btc_volatility_180d
+        description: "Bitcoin annualised volatility over 180 days"
+      - name: relative_volatility_180d_vs_btc
+        description: "Asset volatility / BTC volatility over 180 days"
+      - name: asset_volatility_365d
+        description: "Asset annualised volatility over 365 days"
+      - name: btc_volatility_365d
+        description: "Bitcoin annualised volatility over 365 days"
+      - name: relative_volatility_365d_vs_btc
+        description: "Asset volatility / BTC volatility over 365 days"
+      - name: __dbt_updated_at
+        description: "Timestamp when dbt last refreshed this row"    
+ 
 
   - name: volatility_correlation_summary
     description: "Pairwise correlation matrix and annualised volatility comparison"
@@ -159,18 +448,42 @@ models:
           value: 21
     columns:
       - name: symbol_a
+        description: "First asset in the pair"
         tests: [not_null]
       - name: symbol_b
+        description: "Second asset in the pair"
         tests: [not_null]
       - name: correlation
+        description: "Pearson correlation of daily returns between the two assets"
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
               min_value: -1.0
               max_value: 1.0
       - name: obs_count
+        description: "Number of overlapping trading days used to compute correlation"
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
               min_value: 1
       - name: volatility_a
+        description: "Annualised volatility of asset A"
       - name: volatility_b
+        description: "Annualised volatility of asset B"
+      - name: ann_return_a
+        description: "Annualised return of asset A"
+      - name: ann_return_b
+        description: "Annualised return of asset B"
+      - name: avg_daily_return_a
+        description: "Average daily return of asset A"
+      - name: avg_daily_return_b
+        description: "Average daily return of asset B"
+      - name: max_gain_a
+        description: "Largest single-day gain of asset A"
+      - name: max_gain_b
+        description: "Largest single-day gain of asset B"
+      - name: max_loss_a
+        description: "Largest single-day loss of asset A"
+      - name: max_loss_b
+        description: "Largest single-day loss of asset B"
+      - name: __dbt_updated_at
+        description: "Timestamp when dbt last refreshed this row"

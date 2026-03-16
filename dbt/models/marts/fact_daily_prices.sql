@@ -67,11 +67,6 @@ with_calculations AS (
         END AS daily_return,
 
         CASE
-            WHEN prev_close_price IS NOT NULL AND prev_close_price > 0 AND close_price > 0
-            THEN LN(close_price / prev_close_price)
-        END AS log_return,
-
-        CASE
             WHEN high_price IS NOT NULL AND low_price IS NOT NULL AND close_price > 0
             THEN (high_price - low_price) / close_price
         END AS intraday_range_pct,
@@ -102,7 +97,6 @@ SELECT
     wc.market_cap,
 
     wc.daily_return,
-    wc.log_return,
     wc.prev_close_price,
     wc.intraday_range_pct,
     wc.days_since_prev,
