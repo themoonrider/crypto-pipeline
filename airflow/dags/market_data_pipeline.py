@@ -6,7 +6,6 @@ Orchestrates:
   2. Load raw JSON from GCS → BigQuery raw tables
   3. dbt run (BashOperator): staging → marts (star schema, metrics)
   4. dbt test (BashOperator): data quality checks
-  5. Export summary reports from BigQuery to GCS as CSV
 
 Schedule: Daily at 6 AM UTC (after Asian market close, before EU open)
 
@@ -28,14 +27,15 @@ from airflow import DAG
 from airflow.models.param import Param
 from airflow.decorators import task
 from airflow.operators.empty import EmptyOperator
+from airflow.operators.bash import BashOperator
 from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQueryOperator
 from airflow.utils.trigger_rule import TriggerRule
-from operators.massive_operator import MassiveAPIOperator
-from operators.coingecko_operator import CoinGeckoOperator
+from operators import MassiveAPIOperator, CoinGeckoOperator
 
 
 GCP_PROJECT = os.getenv("GCP_PROJECT_ID", "")
 GCS_BUCKET = os.getenv("GCS_BUCKET", "")
+BQ_RAW_DATASET = "raw_market_data"
 BQ_LOCATION = os.getenv("BQ_LOCATION", "US")
 DBT_DIR = "/opt/airflow/dbt"
 
@@ -134,7 +134,7 @@ with DAG(
         task_id="load_massive_to_bq",
         bucket=GCS_BUCKET,
         source_objects=massive_gcs_keys,
-        destination_project_dataset_table=f"{GCP_PROJECT}.raw_market_data.massive_prices",
+        destination_project_dataset_table=f"{GCP_PROJECT}.{BQ_RAW_DATASET}.massive_prices",
         source_format="NEWLINE_DELIMITED_JSON",
         write_disposition="WRITE_APPEND",
         autodetect=False,
@@ -149,7 +149,7 @@ with DAG(
         task_id="load_coingecko_to_bq",
         bucket=GCS_BUCKET,
         source_objects=coingecko_gcs_keys,
-        destination_project_dataset_table=f"{GCP_PROJECT}.raw_market_data.coingecko_market_chart",
+        destination_project_dataset_table=f"{GCP_PROJECT}.{BQ_RAW_DATASET}.coingecko_market_chart",
         source_format="NEWLINE_DELIMITED_JSON",
         write_disposition="WRITE_APPEND",
         autodetect=False,
@@ -161,10 +161,36 @@ with DAG(
     )
 
 
-    
+    # ── dbt ────────────────────────────────────────────────────────────────────
+    dbt_run = BashOperator(
+        task_id="dbt_run",
+        bash_command=f"dbt run --project-dir {DBT_DIR} --profiles-dir {DBT_DIR} --full-refresh",
+    )
 
-    
+    dbt_test = BashOperator(
+        task_id="dbt_test",
+        bash_command=(
+            f"dbt test --store-failures --project-dir {DBT_DIR} --profiles-dir {DBT_DIR}"
+        ),
+    )
+
+    @task(trigger_rule=TriggerRule.ONE_FAILED)
+    def alert_dbt_test_failure(**context):
+        ti = context["ti"]
+        log = context["log"]
+        log.warning(
+            "[ALERT] dbt test failed in DAG run %s. "
+            "Check test_results schema in BigQuery for failing rows. "
+            "Task: %s",
+            context["run_id"],
+            ti.task_id,
+        )
+
+    alert = alert_dbt_test_failure()
+
     # ── Dependencies ──────────────────────────────────────────────────────────
     start >> [ingest_massive, ingest_coingecko]
     massive_gcs_keys >> load_massive_to_bq
     coingecko_gcs_keys >> load_coingecko_to_bq
+    [load_massive_to_bq, load_coingecko_to_bq] >> dbt_run >> dbt_test
+    dbt_test >> alert >> end
