@@ -96,6 +96,8 @@ services:
     <<: *airflow-common
     command: >
       airflow scheduler
+    ports:
+      - "8081:8081"
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
       interval: 30s
