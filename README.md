@@ -166,6 +166,8 @@ dim_assets ──── fact_daily_prices ────────┤
 
 ### Tables
 
+More on table description and schema is found in `dbt/models/schema.yml`
+
 | Table | Dataset | Description |
 |-------|---------|-------------|
 | `massive_prices` | raw_market_data | Raw OHLCV from Massive API |
@@ -194,36 +196,92 @@ Failing test results are stored in the `test_results` dataset in BigQuery (`+sto
 
 The `sample_data/` directory contains example CSV outputs from dbt models for reference.
 
-## Sample Queries
+## Written analysis 
 
-### Best performers vs Bitcoin (365d)
+### Best performers vs Bitcoin (1Y, YTD, 6M, 3M, 1M, 7D) - (Data as of 2026-03-13)
 
+Sample query:
 ```sql
+-- Best performers vs Bitcoin 1Y - GOOGL
 SELECT
     symbol,
     return_365d,
     btc_return_365d,
-    outperformance_vs_btc_365d,
-    volatility_365d,
-    rank_return_365d
-FROM marts.asset_performance_summary
+    outperformance_vs_btc_365d
+FROM dbt_marts.asset_performance_summary_latest
 ORDER BY outperformance_vs_btc_365d DESC;
 ```
+Results: Best performers vs Bitcoin over period of:
+1Y - GOOGL
+YTD - GOOGL
+6M - GOOGL
+3M - GOOGL
+1M - C:GBPUSD
+7D - GOOGL
 
-### Correlation matrix
 
+### Current worth of a $1K USD vs Bitcoin investment made one year ago - (Data as of 2026-03-13)
+date
+2026-03-13 - 70544.43 USD/bitcoin
+2025-03-13 - 83884.24 USD/bitcoin
+A $1K USD investment in bitcoin on 2025-03-13 would have made a **loss** of 
+(1000/83884.24)*70544.43 - 1000 =  -159 USD or -15.9% return
+
+
+### Return from $100/month dollar-cost over 12 months vs initial lump sum to bitcoin
+As of 2026-03-13. 
+Case 1: Invested $100*12 = $1200 USD on 2025-03-13:
+Return on 2026-03-13: (1200/83884.24)*70544.43 - 1200 = -190 USD
+
+Case 2: Invested $100/month over 12 months from 2025-03-13 to 2026-02-13:
+Return as of 2026-03-13:  -325 USD 
+```sql 
+select sum(100/close_price) as total_bitcoin_units,
+ sum(100/close_price)*70544.43 - 1200 as `return`
+from dbt_marts.fact_daily_prices
+where symbol = 'bitcoin' and extract(day from price_date) = 13
+and price_date <= '2026-02-13'
+```
+Both cases last year from 2025-03-13 made a **loss** but an initial lump sum investment made lesser loss compared to monthly investment
+
+### Volatility comparison: fiat currencies vs Bitcoin
+Looking purely at returns, bitcoin is more volatile. We can look at volatility metrics to see if daily return of bitcoin vs other stocks/forex and index is more volatile.
 ```sql
-SELECT symbol_a, symbol_b, correlation
-FROM marts.volatility_correlation_summary
-ORDER BY ABS(correlation) DESC;
+select symbol, relative_volatility_365d_vs_btc
+from dbt_marts.asset_performance_summary_latest 
 ```
+| Symbol    | Volatility vs BTC (365d) | Interpretation               |
+|-----------|-------------------------:|------------------------------|
+| C:GBPUSD  |                   0.1763 | 17.6% of BTC's volatility    |
+| C:EURUSD  |                   0.1889 | 18.9% of BTC's volatility    |
+| SPY       |                   0.5140 | 51.4% of BTC's volatility    |
+| MSFT      |                   0.7115 | 71.2% of BTC's volatility    |
+| GOOGL     |                   0.8288 | 82.9% of BTC's volatility    |
+| AAPL      |                   0.8682 | 86.8% of BTC's volatility    |
 
-## Development
 
-### Run dbt manually
+This query shows that all assets are less volatile than bitcoin. Forex pairs are the most stable while stocks are closest to bitcoin. SPY is half as volatile as bitcoin. 
 
-```bash
-make dbt-run
-make dbt-test
-make dbt-docs
-```
+## Extra credit
+
+### Swap events
+1. Please see the attached `etherscan_swap_events.pdf` in `sample_data/swap_events` for recent swap events
+2. For the provided swap event in the screenshot:
+sender:0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
+to: 0x423D607Bd4E213e9b64a54b324Ab7F632FEeC647
+amount0In (uint256) :0
+amount1In (uint256) : 45493335506378983
+amount0Out (uint256): 101969968
+amount1Out (uint256) : 0
+3. For the provided swap event in the provided screenshot at `swap_events/single_swap_event.png`:
+topic0: 0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822
+transaction hash: 0x547195a1b9b65fc73f8c71d20cea0c6f5c8d7f6e021904471a2b988980ec92ff
+address: 0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc
+token0:0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 
+token1:0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2 
+4. Human-readable values are:
+token0: USDC
+token1: WETH
+
+### Dune Analytics
+[Query] (https://dune.com/queries/5728529/9297690)
